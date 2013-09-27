@@ -1,0 +1,142 @@
+#!/usr/bin/php
+<?php
+
+
+define('COMPRESSION', false);
+
+
+if (empty($argv[1]) || !file_exists($argv[1])) {
+    error_log('Unable to locate xhprof data file');
+    exit(1);
+}
+
+if (!$file = file_get_contents($argv[1])) {
+    error_log('Unable to load data file');
+    exit(1);
+}
+
+if (!$xhprof = json_decode($file)) {
+    error_log('Unable to decode data file');
+    exit(1);
+}
+
+
+if (file_exists($argv[1].'.map')) {
+    @$map = json_decode(file_get_contents($argv[1].'.map'), true);
+}
+
+
+$funcs = array();
+$totalcost = 0;
+
+
+foreach ($xhprof as $edge => $data) {
+    list($fn, $cfn) = strpos($edge, '==>') !== false ? explode('==>', $edge, 2) : array($edge, null);
+
+    if (!isset($funcs[$fn])) {
+        $funcs[$fn] = new stdClass;
+        $funcs[$fn]->children = array();
+    }
+
+    if (!isset($cfn)) {
+        $funcs[$fn]->data = clone $data;
+        continue;
+    }
+
+    $funcs[$fn]->children[$cfn] = clone $data;
+
+    if (!isset($funcs[$cfn]->data)) {
+        if (!isset($funcs[$cfn])) {
+            $funcs[$cfn] = new stdClass;
+            $funcs[$cfn]->children = array();
+        }
+        $funcs[$cfn]->data = clone $data;
+        continue;
+    }
+
+    foreach ($data as $k => $v) {
+        $funcs[$cfn]->data->$k += $v;
+    }
+}
+
+
+$totalcost = $funcs['main()']->data->wt;
+
+
+// Calculate exclusive costs for each function.
+foreach ($funcs as $fn => $f) {
+    foreach ($f->children as $cfn => $d) {
+        foreach ($d as $k => $v) {
+            if ($k !== 'ct') {
+                $f->data->$k -= $v;
+            }
+        }
+    }
+}
+
+
+echo <<<HEADER
+version: 1
+creator: xh2cg for xhprof
+cmd: Unknown PHP script
+part: 1
+positions: line
+events: Time
+summary: $totalcost
+
+
+HEADER;
+
+
+function comp($t, $v) {
+    if (!COMPRESSION) {
+        return $v;
+    }
+
+    static $seen = array();
+
+    if (!isset($seen[$t])) {
+        $seen[$t] = array();
+    }
+
+    if (!isset($seen[$t][$v])) {
+        $seen[$t][$v] = !empty($seen[$t]) ? reset($seen[$t]) + 1 : 1;
+        return "({$seen[$t][$v]}) $v";
+    }
+
+    return "({$seen[$t][$v]})";
+}
+
+
+function map($f) {
+    global $map;
+    $f = preg_replace('#@\d+$#', '', $f);
+    $v = array('file' => '<unknown>', 'line' => 0);
+    if (!empty($map[$f])) {
+        $v = array_merge($v, $map[$f]);
+    }
+    return array_values($v);
+}
+
+
+foreach ($funcs as $fn => $f) {
+    list($fl, $fline) = map($fn);
+    if (!empty($fl)) {
+        echo "fl=".comp('fl', $fl)."\n"; // file name
+    }
+    echo "fn=".comp('fn', $fn)."\n"; // function name
+    echo "$fline {$f->data->wt}\n"; // exclusive time
+    foreach ($f->children as $cfn => $d) {
+        list($cfl, $cfline) = map($cfn);
+        if ($cfl != $fl && !empty($cfl)) {
+            echo "cfl=".comp('cfl', $cfl)."\n"; // child function file name
+        }
+        echo "cfn=".comp('cfn', $cfn)."\n"; // child function name
+        echo "calls={$d->ct} $cfline\n"; // called N times
+        echo "$fline {$d->wt}\n"; // lineno and cost
+    }
+    echo "\n";
+}
+
+
+echo "totals: $totalcost\n";
