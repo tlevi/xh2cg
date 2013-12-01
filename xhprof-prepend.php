@@ -1,6 +1,8 @@
 <?php
 
+
 if (!function_exists('xhprof_enable')) {
+    error_log('missing xhprof');
     return;
 }
 
