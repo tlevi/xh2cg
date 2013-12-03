@@ -86,12 +86,11 @@ class xh2cg {
         }
 
         // Calculate exclusive costs for each function.
+        $reduce = array_keys($types);
         foreach ($funcs as $fn => $f) {
             foreach ($f->children as $cfn => $d) {
-                foreach ($d as $k => $v) {
-                    if ($k !== 'ct') {
-                        $f->data->$k -= $v;
-                    }
+                foreach ($reduce as $k) {
+                    $f->data->$k -= $d->$k;
                 }
             }
         }
