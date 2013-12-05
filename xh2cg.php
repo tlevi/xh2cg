@@ -15,15 +15,15 @@ class xh2cg {
             // Invokes as main program, perform conversion.
             error_log('convert');
             if (empty($argv[1]) || !file_exists($argv[1])) {
-                error_log('Unable to locate xhprof data file');
+                error_log('xh2cg: Unable to locate xhprof data file');
                 exit(1);
             }
             if (!$file = file_get_contents($argv[1])) {
-                error_log('Unable to load data file');
+                error_log('xh2cg: Unable to load data file');
                 exit(1);
             }
             if (!$xhprof = json_decode($file)) {
-                error_log('Unable to decode data file');
+                error_log('xh2cg: Unable to decode data file');
                 exit(1);
             }
             if (file_exists($argv[1].'.map')) {
@@ -44,7 +44,7 @@ class xh2cg {
             throw new Exception('Failed to open output file!');
         }
 
-        $types = array('wt'=>'Time', 'cpu'=>'CPU', 'mu'=>'Memory', 'pmu'=>'Peak_memory');
+        $types = array('wt'=>'WallTime', 'cpu'=>'CPU', 'mu'=>'Memory', 'pmu'=>'Peak_memory');
         $totals = array();
         $funcs = array();
 
@@ -161,18 +161,17 @@ class xh2cg {
 
     protected static function profile($convert) {
         if (!function_exists('xhprof_enable')) {
-            error_log('missing xhprof');
             return false;
         }
 
-        error_log('enabling xhprof');
-        xhprof_enable(XHPROF_FLAGS_CPU | XHPROF_FLAGS_MEMORY);
+        xhprof_enable(XHPROF_FLAGS_MEMORY);
 
         global $argv;
         $main = $argv[0];
 
         register_shutdown_function(function () use ($convert, $main) {
-            error_log('disabling xhprof');
+            $shutdownextra = 32 * 1024 * 1024;
+            @ini_set('memory_limit', memory_get_usage() + $shutdownextra);
             $xhprof = xhprof_disable();
             $funcs = array();
             foreach ($xhprof as $edge => $unused) {
@@ -215,8 +214,6 @@ class xh2cg {
 
             file_put_contents('/tmp/xhprof.out.'.time().'.'.getmypid(), json_encode($xhprof, JSON_PRETTY_PRINT));
             file_put_contents('/tmp/xhprof.out.'.time().'.'.getmypid().'.map', json_encode($funcs, JSON_PRETTY_PRINT));
-
-//            return array($xhprof, $funcs);
         });
     }
 }

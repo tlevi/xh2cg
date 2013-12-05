@@ -15,9 +15,7 @@ function slow() {
 
 function sleepy() {
     $x = time();
-    for ($i=0; $i < 3; $i++) {
-        sleep(1);
-    }
+    sleep(1);
     return time() - $x;
 }
 
@@ -38,6 +36,7 @@ function fatty() {
 
 $a = slow();
 $a += sleepy();
+$a += fatty();
 $a += fatty();
 
 
