@@ -46,7 +46,7 @@ register_shutdown_function(function () use ($main) {
     }
     $funcs['main()'] = array('line' => 0, 'file' => $main);
     $funcs = array_filter($funcs);
-    file_put_contents('/tmp/xhprof.out', json_encode($xhprof, JSON_PRETTY_PRINT));
-    file_put_contents('/tmp/xhprof.out.map', json_encode($funcs, JSON_PRETTY_PRINT));
+    file_put_contents('/tmp/xhprof.out.'.getmypid(), json_encode($xhprof, JSON_PRETTY_PRINT));
+    file_put_contents('/tmp/xhprof.out.map.'.getmypid(), json_encode($funcs, JSON_PRETTY_PRINT));
 });
 
