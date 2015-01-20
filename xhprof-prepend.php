@@ -1,16 +1,13 @@
 <?php
 
-
 if (!function_exists('xhprof_enable')) {
-    error_log('missing xhprof');
     return;
 }
 
 error_log('enabling xhprof');
 xhprof_enable();
-global $argv;
-$main = $argv[0];
-register_shutdown_function(function () use ($main) {
+register_shutdown_function(function () {
+    global $argv;
     error_log('disabling xhprof');
     $xhprof = xhprof_disable();
     $funcs = array();
@@ -44,9 +41,12 @@ register_shutdown_function(function () use ($main) {
             $funcs[$fn] = array('line' => $line, 'file' => $file);
         }
     }
-    $funcs['main()'] = array('line' => 0, 'file' => $main);
+    $funcs['main()'] = array('line' => 0, 'file' => $argv[0]);
     $funcs = array_filter($funcs);
-    file_put_contents('/tmp/xhprof.out.'.getmypid(), json_encode($xhprof, JSON_PRETTY_PRINT));
-    file_put_contents('/tmp/xhprof.out.map.'.getmypid(), json_encode($funcs, JSON_PRETTY_PRINT));
+    file_put_contents('/tmp/xhprof.out', json_encode($xhprof, JSON_PRETTY_PRINT));
+    file_put_contents('/tmp/xhprof.out.map', json_encode($funcs, JSON_PRETTY_PRINT));
+    if (file_exists('/usr/bin/kcachegrind')) {
+        exec(__DIR__."/xh2cg /tmp/xhprof.out >/tmp/callgrind.out 2>/dev/null; /usr/bin/kcachegrind /tmp/callgrind.out &>/dev/null &");
+    }
 });
 
