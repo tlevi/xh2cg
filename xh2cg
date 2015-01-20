@@ -3,6 +3,7 @@
 
 
 define('COMPRESSION', false);
+ini_set('memory_limit', '2G');
 
 
 if (empty($argv[1]) || !file_exists($argv[1])) {
